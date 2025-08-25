@@ -1,0 +1,10 @@
+---
+ldap_admin_password: "admin"
+ldap_domain: "uno-soft.ru"
+ldap_organization: "Uno-Soft Inc"
+ldap_users:
+  - { name: "user1", surname: "User1", uid: "1001", password: "pass1" }
+  - { name: "user2", surname: "User2", uid: "1002", password: "pass2" }
+ldap_groups:
+  - { name: "developers", gid: "2001" }
+  - { name: "admins", gid: "2002" }

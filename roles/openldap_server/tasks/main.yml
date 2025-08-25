@@ -1,0 +1,177 @@
+---
+- name: Check if OpenLDAP is already installed
+  stat:
+    path: /usr/sbin/slapd
+  register: slapd_installed
+
+- name: Check if LDAP is already running
+  systemd:
+    name: slapd
+  register: slapd_service
+  changed_when: false
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when: not slapd_installed.stat.exists
+
+- name: Set debconf values using shell
+  shell: |
+    echo "slapd slapd/password1 password {{ ldap_admin_password }}" | debconf-set-selections
+    echo "slapd slapd/password2 password {{ ldap_admin_password }}" | debconf-set-selections
+    echo "slapd slapd/domain string {{ ldap_domain }}" | debconf-set-selections
+    echo "slapd slapd/organization string {{ ldap_organization }}" | debconf-set-selections
+  when: not slapd_installed.stat.exists
+
+- name: Install OpenLDAP server and utilities
+  apt:
+    name:
+      - slapd
+      - ldap-utils
+      - ldapscripts
+      - python3-ldap
+    state: present
+    install_recommends: no
+  when: not slapd_installed.stat.exists
+
+- name: Reconfigure slapd non-interactively
+  command: dpkg-reconfigure -f noninteractive slapd
+  become: yes
+  when: not slapd_installed.stat.exists
+
+- name: Pause for slapd to initialize
+  pause:
+    seconds: 10
+  when: not slapd_installed.stat.exists
+
+- name: Create organizational unit for people
+  community.general.ldap_entry:
+    dn: "ou=people,{{ ldap_base_dn }}"
+    objectClass: organizationalUnit
+    attributes:
+      ou: people
+    state: present
+    bind_dn: "cn=admin,{{ ldap_base_dn }}"
+    bind_pw: "{{ ldap_admin_password }}"
+    server_uri: "ldap://localhost"
+
+- name: Create organizational unit for groups
+  community.general.ldap_entry:
+    dn: "ou=groups,{{ ldap_base_dn }}"
+    objectClass: organizationalUnit
+    attributes:
+      ou: groups
+    state: present
+    bind_dn: "cn=admin,{{ ldap_base_dn }}"
+    bind_pw: "{{ ldap_admin_password }}"
+    server_uri: "ldap://localhost"
+
+- name: Add users to LDAP (without passwords first)
+  community.general.ldap_entry:
+    dn: "uid={{ item.name }},ou=people,{{ ldap_base_dn }}"
+    objectClass:
+      - inetOrgPerson
+      - posixAccount
+      - shadowAccount
+    attributes:
+      cn: "{{ item.name }}"
+      sn: "{{ item.surname }}"
+      uid: "{{ item.name }}"
+      uidNumber: "{{ item.uid }}"
+      gidNumber: "100"
+      homeDirectory: "/home/{{ item.name }}"
+      loginShell: "/bin/bash"
+    state: present
+    bind_dn: "cn=admin,{{ ldap_base_dn }}"
+    bind_pw: "{{ ldap_admin_password }}"
+    server_uri: "ldap://localhost"
+  loop: "{{ ldap_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Set passwords for users using ldappasswd
+  command: |
+    ldappasswd -x -D "cn=admin,{{ ldap_base_dn }}" -w "{{ ldap_admin_password }}" \
+    -s "{{ item.password }}" "uid={{ item.name }},ou=people,{{ ldap_base_dn }}"
+  loop: "{{ ldap_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Add groups to LDAP
+  community.general.ldap_entry:
+    dn: "cn={{ item.name }},ou=groups,{{ ldap_base_dn }}"
+    objectClass:
+      - posixGroup
+    attributes:
+      cn: "{{ item.name }}"
+      gidNumber: "{{ item.gid }}"
+    state: present
+    bind_dn: "cn=admin,{{ ldap_base_dn }}"
+    bind_pw: "{{ ldap_admin_password }}"
+    server_uri: "ldap://localhost"
+  loop: "{{ ldap_groups }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure slapd service is running and enabled
+  systemd:
+    name: slapd
+    state: started
+    enabled: yes
+
+- name: Verify LDAP installation - Base DN
+  command: ldapsearch -x -b "{{ ldap_base_dn }}" -D "cn=admin,{{ ldap_base_dn }}" -w "{{ ldap_admin_password }}"
+  register: ldap_base_result
+  changed_when: false
+
+- name: Verify LDAP users
+  command: ldapsearch -x -b "ou=people,{{ ldap_base_dn }}" -D "cn=admin,{{ ldap_base_dn }}" -w "{{ ldap_admin_password }}"
+  register: ldap_users_result
+  changed_when: false
+
+- name: Verify LDAP groups
+  command: ldapsearch -x -b "ou=groups,{{ ldap_base_dn }}" -D "cn=admin,{{ ldap_base_dn }}" -w "{{ ldap_admin_password }}"
+  register: ldap_groups_result
+  changed_when: false
+
+- name: Show LDAP base result status
+  debug:
+    msg: "LDAP Base DN search returned exit code {{ ldap_base_result.rc }}"
+
+- name: Show LDAP users result status
+  debug:
+    msg: "LDAP Users search returned exit code {{ ldap_users_result.rc }}"
+
+- name: Show LDAP groups result status
+  debug:
+    msg: "LDAP Groups search returned exit code {{ ldap_groups_result.rc }}"
+
+- name: Simple users count check
+  debug:
+    msg: "LDAP users search completed successfully"
+  when: ldap_users_result.rc == 0
+
+- name: Simple groups count check
+  debug:
+    msg: "LDAP groups search completed successfully"
+  when: ldap_groups_result.rc == 0
+
+- name: Final success message
+  debug:
+    msg: |
+      OpenLDAP installation completed successfully!
+      ============================================
+      Admin DN: cn=admin,{{ ldap_base_dn }}
+      Base DN: {{ ldap_base_dn }}
+      Users created: {{ ldap_users | map(attribute='name') | join(', ') }}
+      Groups created: {{ ldap_groups | map(attribute='name') | join(', ') }}
+      
+      To test connection:
+      ldapsearch -x -b "{{ ldap_base_dn }}" -D "cn=admin,{{ ldap_base_dn }}" -w "{{ ldap_admin_password }}"
+  when: ldap_base_result.rc == 0
+
+- name: Warning message if LDAP not accessible
+  debug:
+    msg: "LDAP installation completed but there might be connection issues. Check slapd service status."
+  when: ldap_base_result.rc != 0

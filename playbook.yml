@@ -1,0 +1,9 @@
+---
+- name: Install and configure OpenLDAP server
+  hosts: ldap_servers
+  become: yes
+  vars_files:
+    - group_vars/all.yml
+
+  roles:
+    - role: openldap_server
