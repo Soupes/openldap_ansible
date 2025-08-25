@@ -92,3 +92,5 @@ ok: [localhost] => {
     "msg": "OpenLDAP installation completed successfully!\n============================================\nAdmin DN: cn=admin,dc=uno-soft,dc=ru\nBase DN: dc=uno-soft,dc=ru\nUsers created: user1, user2\nGroups created: developers, admins\n\nTo test connection:\nldapsearch -x -b \"dc=uno-soft,dc=ru\" -D \"cn=admin,dc=uno-soft,dc=ru\" -w \"admin\"\n"
 }
 
+![photo_2025-08-25_15-18-21](https://github.com/user-attachments/assets/a2ea733d-f5a0-4916-9fe0-e73addc8e87e)
+
