@@ -42,10 +42,12 @@ ldap_groups:
   - { name: "developers", gid: "2001" }
   - { name: "admins", gid: "2002" }
 
-1. Установите необходимые коллекции Ansible
-ansible-galaxy collection install community.general
-2. . Запустите плейбук
-ansible-playbook playbook.yml -i inventory.ini
+Установите необходимые коллекции Ansible
+   
+	ansible-galaxy collection install community.general
+Запустить
+
+	ansible-playbook playbook.yml -i inventory.ini
 
 Что устанавливается и настраивается
 
@@ -67,23 +69,23 @@ ansible-playbook playbook.yml -i inventory.ini
 
 Проверка подключения
 
-ldapwhoami -x -D "cn=admin,dc=uno-soft,dc=ru" -w admin
+	ldapwhoami -x -D "cn=admin,dc=uno-soft,dc=ru" -w admin
 
 Поиск всех записей
 
-ldapsearch -x -b "dc=uno-soft,dc=ru" -D "cn=admin,dc=uno-soft,dc=ru" -w admin
+	ldapsearch -x -b "dc=uno-soft,dc=ru" -D "cn=admin,dc=uno-soft,dc=ru" -w admin
 
 Поиск пользователей
 
-ldapsearch -x -b "ou=people,dc=uno-soft,dc=ru" -D "cn=admin,dc=uno-soft,dc=ru" -w admin
+	ldapsearch -x -b "ou=people,dc=uno-soft,dc=ru" -D "cn=admin,dc=uno-soft,dc=ru" -w admin
 
 Поиск групп
 
-ldapsearch -x -b "ou=groups,dc=uno-soft,dc=ru" -D "cn=admin,dc=uno-soft,dc=ru" -w admin
+	ldapsearch -x -b "ou=groups,dc=uno-soft,dc=ru" -D "cn=admin,dc=uno-soft,dc=ru" -w admin
 
 Проверка конкретного пользователя
 
-ldapsearch -x -b "uid=user1,ou=people,dc=uno-soft,dc=ru" -D "cn=admin,dc=uno-soft,dc=ru" -w admin
+	ldapsearch -x -b "uid=user1,ou=people,dc=uno-soft,dc=ru" -D "cn=admin,dc=uno-soft,dc=ru" -w admin
 
 Результат
 
